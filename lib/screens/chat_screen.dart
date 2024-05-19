@@ -1,5 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:intl/intl.dart';
@@ -63,6 +64,9 @@ class _ChatScreenState extends State<ChatScreen> {
     switch (value) {
       case 'play':
         speak(message.text);
+        break;
+      case 'copy':
+        Clipboard.setData(ClipboardData(text: message.text));
         break;
       case 'delete':
         int id = message.id!;
@@ -155,6 +159,10 @@ class _ChatScreenState extends State<ChatScreen> {
                         PopupMenuItem<String>(
                           value: 'play',
                           child: Text('Play'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'copy',
+                          child: Text('Copy'),
                         ),
                         PopupMenuItem<String>(
                           value: 'delete',
