@@ -46,6 +46,12 @@ class DatabaseHelper {
     );
   }
 
+  // Modifikasi disini
+  Future<void> deleteAllMessages() async {
+    final db = await database;
+    await db.delete('messages');
+  }
+
   Future<void> insertMessage(Message message) async {
     final db = await instance.database;
     await db.insert(

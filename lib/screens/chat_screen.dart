@@ -1,7 +1,9 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: prefer_const_constructors
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:intl/intl.dart';
 import 'package:my_generative_ai_app/bloc/ai_bloc.dart';
@@ -25,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   List<Message> _messages = [];
   bool _isSpeaking = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -60,20 +63,34 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _onPopupMenuSelected(String value, Message message) {
-    // Handle the selected menu option
     switch (value) {
       case 'play':
         speak(message.text);
         break;
       case 'copy':
         Clipboard.setData(ClipboardData(text: message.text));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: grey.withOpacity(0.5),
+            content: Text('Copied to clipboard'),
+          ),
+        );
         break;
       case 'delete':
-        int id = message.id!;
-        setState(() {
-          _messages.remove(message);
-          DatabaseHelper.instance.removeMessage(id);
-        });
+        int? id = message.id;
+        if (id != null) {
+          setState(() {
+            DatabaseHelper.instance.removeMessage(id);
+            _messages.remove(message);
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: grey.withOpacity(0.5),
+              content: Text('Failed to delete message: ID is null'),
+            ),
+          );
+        }
         break;
     }
   }
@@ -103,11 +120,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: background,
         elevation: 2,
-        leading: Icon(
-          Icons.back_hand_rounded,
-          size: 30.0,
-          color: background,
+        leading: Container(
+          margin: EdgeInsets.all(10),
+          child: SvgPicture.asset(
+            'assets/robot.svg',
+          ),
         ),
         titleSpacing: 0,
         title: Column(
@@ -115,11 +134,12 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             title(
               title: "Gen-Ai",
-              color: background,
+              fontSize: 20,
+              color: white,
             ),
             text(
-              title: "online",
-              color: green,
+              title: _isLoading ? "sedang mengetik . . ." : "online",
+              color: grey,
               fontSize: 12,
             ),
           ],
@@ -135,10 +155,32 @@ class _ChatScreenState extends State<ChatScreen> {
               },
               icon: Icon(
                 Icons.volume_up,
-                color: background,
+                color: white,
                 size: 24.0,
               ),
             ),
+          PopupMenuButton(
+              iconColor: white,
+              onSelected: (String result) {
+                setState(() {
+                  if (result == 'delete_all') {
+                    DatabaseHelper.instance.deleteAllMessages();
+                    _messages.clear();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: grey.withOpacity(0.5),
+                        content: const Text('Delete All Messages'),
+                      ),
+                    );
+                  }
+                });
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                    const PopupMenuItem(
+                      value: 'delete_all',
+                      child: Text('Delete All Messages'),
+                    )
+                  ]),
         ],
       ),
       body: Column(
@@ -204,10 +246,13 @@ class _ChatScreenState extends State<ChatScreen> {
                           Expanded(
                             child: TextFormField(
                               initialValue: null,
+                              keyboardType: TextInputType.multiline,
+                              maxLines: 4,
+                              minLines: 1,
                               decoration: InputDecoration.collapsed(
                                 filled: true,
                                 fillColor: Colors.transparent,
-                                hintText: "type here...",
+                                hintText: "Type a message...",
                                 hintStyle: TextStyle(
                                   color: Colors.grey[500],
                                 ),
@@ -226,6 +271,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 IconButton(
                   onPressed: () async {
                     final messageText = _controller.text;
+
                     if (messageText.isNotEmpty) {
                       final userMessage = Message(
                           text: messageText,
@@ -233,6 +279,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           time: DateTime.now().toString());
 
                       await DatabaseHelper.instance.insertMessage(userMessage);
+                      _loadMessages();
                       _addMessage(userMessage);
                       context.read<AiBloc>().add(GenerateContent(messageText));
                       _controller.clear();
@@ -249,6 +296,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           BlocListener<AiBloc, AiState>(
             listener: (context, state) async {
+              _isLoading = true;
               if (state is AiLoaded) {
                 final aiMessage = Message(
                   text: state.content,
@@ -256,7 +304,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   isUserMessage: false,
                 );
                 await DatabaseHelper.instance.insertMessage(aiMessage);
+                _loadMessages();
                 _addMessage(aiMessage);
+                _isLoading = false;
               }
             },
             child: Container(),

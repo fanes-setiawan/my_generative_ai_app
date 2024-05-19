@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:my_generative_ai_app/constan/color.dart';
 
 class Avatar extends StatelessWidget {
@@ -11,10 +12,11 @@ class Avatar extends StatelessWidget {
     return CircleAvatar(
       backgroundColor: background,
       radius: radius,
-      child: Icon(
-        Icons.back_hand_rounded,
-        size: radius,
-        color: white,
+      child: Container(
+        margin: const EdgeInsets.all(2),
+        child: SvgPicture.asset(
+          'assets/robot.svg',
+        ),
       ),
     );
   }

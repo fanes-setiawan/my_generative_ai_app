@@ -72,7 +72,7 @@ class ChatBubble extends StatelessWidget {
   Widget _buildLeading(BubbleType type) {
     if (type == BubbleType.alone || type == BubbleType.bottom) {
       return const Avatar(
-        radius: 12,
+        radius: 15,
       );
     }
     return const SizedBox(
