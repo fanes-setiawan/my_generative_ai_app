@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:my_generative_ai_app/constan/color.dart';
+import 'package:my_generative_ai_app/constan/font.dart';
 
 import 'avatar.dart';
 
@@ -18,6 +20,7 @@ class ChatBubble extends StatelessWidget {
   final Direction direction;
   final String message;
   final String? photoUrl;
+  final String time;
   final BubbleType type;
 
   const ChatBubble(
@@ -25,11 +28,13 @@ class ChatBubble extends StatelessWidget {
       required this.direction,
       required this.message,
       this.photoUrl,
+      required this.time,
       required this.type});
 
   @override
   Widget build(BuildContext context) {
     final isOnLeft = direction == Direction.left;
+
     return Row(
       mainAxisAlignment:
           isOnLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
@@ -43,14 +48,21 @@ class ChatBubble extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             borderRadius: _borderRadius(direction, type),
-            color: isOnLeft ? Colors.grey[200] : Theme.of(context).primaryColor,
+            color: isOnLeft ? Colors.grey[200] : background,
           ),
-          child: Text(
-            message,
-            style: TextStyle(
-              fontWeight: FontWeight.w400,
-              color: isOnLeft ? Colors.black : Colors.white,
-            ),
+          child: Column(
+            crossAxisAlignment:
+                isOnLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+            children: [
+              Text(
+                message,
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  color: isOnLeft ? Colors.black : Colors.white,
+                ),
+              ),
+              title(title: time, fontSize: 9, color: black.withOpacity(0.5)),
+            ],
           ),
         ),
       ],

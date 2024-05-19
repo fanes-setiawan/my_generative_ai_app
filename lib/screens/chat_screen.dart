@@ -1,5 +1,8 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:intl/intl.dart';
 import 'package:my_generative_ai_app/bloc/ai_bloc.dart';
 import 'package:my_generative_ai_app/constan/color.dart';
 import 'package:my_generative_ai_app/models/message.dart';
@@ -17,13 +20,26 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  final FlutterTts flutterTts = FlutterTts();
   final TextEditingController _controller = TextEditingController();
   List<Message> _messages = [];
+  bool _isSpeaking = false;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    flutterTts.setCompletionHandler(() {
+      setState(() {
+        _isSpeaking = false;
+      });
+    });
+
+    flutterTts.setErrorHandler((msg) {
+      setState(() {
+        _isSpeaking = false;
+      });
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -31,6 +47,46 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _messages = messages.reversed.toList();
     });
+  }
+
+  Future<void> speak(String text) async {
+    setState(() {
+      _isSpeaking = true;
+    });
+    await flutterTts.setLanguage("id-ID");
+    await flutterTts.setPitch(1);
+    await flutterTts.speak(text);
+  }
+
+  void _onPopupMenuSelected(String value, Message message) {
+    // Handle the selected menu option
+    switch (value) {
+      case 'play':
+        speak(message.text);
+        break;
+      case 'delete':
+        int id = message.id!;
+        setState(() {
+          _messages.remove(message);
+          DatabaseHelper.instance.removeMessage(id);
+        });
+        break;
+    }
+  }
+
+  String getFormattedTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time).inDays;
+
+    if (difference == 0) {
+      return DateFormat.Hm().format(time); // Just the time: HH:mm
+    } else if (difference == 1) {
+      return 'Yesterday';
+    } else if (difference > 1 && difference < 3) {
+      return DateFormat('EEE').format(time); // Day of the week: Mon, Tue, etc.
+    } else {
+      return DateFormat('dd MMM').format(time); // Full date: 19 May
+    }
   }
 
   void _addMessage(Message message) {
@@ -54,7 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             title(
-              title: "Ai",
+              title: "Gen-Ai",
               color: background,
             ),
             text(
@@ -64,7 +120,22 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        actions: const [],
+        actions: [
+          if (_isSpeaking == true)
+            IconButton(
+              onPressed: () {
+                flutterTts.stop();
+                setState(() {
+                  _isSpeaking = false;
+                });
+              },
+              icon: Icon(
+                Icons.volume_up,
+                color: background,
+                size: 24.0,
+              ),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -75,12 +146,36 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                return ChatBubble(
-                  direction:
-                      message.isUserMessage ? Direction.right : Direction.left,
-                  message: message.text,
-                  photoUrl: null,
-                  type: BubbleType.alone,
+                return GestureDetector(
+                  onLongPress: () async {
+                    final result = await showMenu(
+                      context: context,
+                      position: const RelativeRect.fromLTRB(100, 0, 0, 0),
+                      items: const [
+                        PopupMenuItem<String>(
+                          value: 'play',
+                          child: Text('Play'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Text('Delete'),
+                        ),
+                      ],
+                    );
+
+                    if (result != null) {
+                      _onPopupMenuSelected(result, message);
+                    }
+                  },
+                  child: ChatBubble(
+                    direction: message.isUserMessage
+                        ? Direction.right
+                        : Direction.left,
+                    message: message.text,
+                    photoUrl: null,
+                    type: BubbleType.alone,
+                    time: getFormattedTime(DateTime.parse(message.time)),
+                  ),
                 );
               },
             ),
@@ -124,8 +219,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   onPressed: () async {
                     final messageText = _controller.text;
                     if (messageText.isNotEmpty) {
-                      final userMessage =
-                          Message(text: messageText, isUserMessage: true);
+                      final userMessage = Message(
+                          text: messageText,
+                          isUserMessage: true,
+                          time: DateTime.now().toString());
+
                       await DatabaseHelper.instance.insertMessage(userMessage);
                       _addMessage(userMessage);
                       context.read<AiBloc>().add(GenerateContent(messageText));
@@ -146,6 +244,7 @@ class _ChatScreenState extends State<ChatScreen> {
               if (state is AiLoaded) {
                 final aiMessage = Message(
                   text: state.content,
+                  time: DateTime.now().toString(),
                   isUserMessage: false,
                 );
                 await DatabaseHelper.instance.insertMessage(aiMessage);

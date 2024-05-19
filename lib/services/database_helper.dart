@@ -31,9 +31,19 @@ class DatabaseHelper {
       CREATE TABLE messages(
         id INTEGER PRIMARY KEY,
         text TEXT,
+        time TEXT,
         isUserMessage INTEGER
       )
     ''');
+  }
+
+  Future<void> removeMessage(int id) async {
+    final db = await instance.database;
+    await db.delete(
+      'messages',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> insertMessage(Message message) async {
@@ -52,6 +62,7 @@ class DatabaseHelper {
       return Message(
         id: maps[i]['id'],
         text: maps[i]['text'],
+        time: maps[i]['time'],
         isUserMessage: maps[i]['isUserMessage'] == 1,
       );
     });
